@@ -16,7 +16,6 @@ known_face_names = []
 last_detected_faces = {}  # Stores last seen faces to prevent reprocessing
 FRAME_SKIP = 3  # Skip every 3 frames for speed
 
-# --- Load Faces ---
 enrollment_files = glob.glob("./data/*.jpg")
 
 if not enrollment_files:
@@ -24,8 +23,10 @@ if not enrollment_files:
 else:
     for file in enrollment_files:
         try:
-            name = os.path.basename(file).rsplit(".", 1)[0]  # Remove file extension
-            name = name.replace("_", " ")  # Convert underscores to spaces
+            # Extract base name without numbers (_1, _2, etc.)
+            raw_name = os.path.basename(file).rsplit(".", 1)[0]  # Remove extension
+            name = " ".join(raw_name.split("_")[:-1])  # Remove last part (_1, _2, etc.)
+
             image = face_recognition.load_image_file(file)
             encodings = face_recognition.face_encodings(image)
 
@@ -38,14 +39,7 @@ else:
 
         except Exception as e:
             print(f"❌ Error loading {file}: {e}")
-
-# Store final encodings
-for name, encodings in last_detected_faces.items():
-    known_face_encodings.extend(encodings)
-    known_face_names.extend([name] * len(encodings))
-
-print(f"🚀 Enrolled {len(known_face_encodings)} faces for {len(set(known_face_names))} people.")
-
+            
 # FPS Tracker
 frame_count = 0
 last_time = time.time()
