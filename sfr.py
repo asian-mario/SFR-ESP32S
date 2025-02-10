@@ -8,7 +8,7 @@ from flask import Flask, Response, render_template_string
 
 app = Flask(__name__)
 
-ESP32_STREAM_URL = "http://192.168.0.74:81/stream"
+ESP32_STREAM_URL = "http://<ESP_IP>:81/stream"
 
 # GLOBAL CACHES (to reduce unnecessary computations)
 known_face_encodings = []
