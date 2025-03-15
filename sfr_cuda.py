@@ -9,7 +9,7 @@ from flask import Flask, Response, render_template_string, send_file, jsonify
 
 app = Flask(__name__)
 
-ESP32_STREAM_URL = "http://<ESP_IP>:81/stream"
+ESP32_STREAM_URL = "http://192.168.0.71:81/stream"
 
 # GLOBAL CACHES
 known_face_encodings = []
@@ -17,7 +17,7 @@ known_face_names = []
 reference_images = {}  # Stores reference images for display
 FRAME_SKIP = 5
 
-# ✅ Check if Dlib is using CUDA (ignore PyTorch)
+# ✅ Check if Dlib is using CUDA
 USE_CUDA = dlib.DLIB_USE_CUDA
 
 if USE_CUDA:
@@ -25,8 +25,8 @@ if USE_CUDA:
 else:
     print("⚠️ CUDA not available, running on CPU!")
 
-# ✅ Use dlib's CUDA-accelerated face detector
-face_detector = dlib.get_frontal_face_detector()
+# ✅ Use Dlib's CUDA-based face detector
+face_detector = dlib.cnn_face_detection_model_v1("./mmod_human_face_detector.dat") if USE_CUDA else dlib.get_frontal_face_detector()
 
 # --- Load Faces ---
 enrollment_files = glob.glob("./data/*.jpg")
@@ -75,21 +75,20 @@ def gen_frames():
             continue
 
         small_frame = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
-        rgb_small_frame = small_frame[:, :, ::-1]
+        rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)  # OpenCV reads in BGR, convert to RGB
 
-        # ✅ Convert image properly
-        dlib_image = dlib.numpy_image(rgb_small_frame)
+        # ✅ CUDA-Accelerated Face Detection
+        if USE_CUDA:
+            detections = face_detector(rgb_small_frame, 1)  # 1 = upscale image once for better detection
+            face_locations = [(d.rect.top(), d.rect.right(), d.rect.bottom(), d.rect.left()) for d in detections]
+        else:
+            detections = face_detector(rgb_small_frame)
+            face_locations = [(d.top(), d.right(), d.bottom(), d.left()) for d in detections]
 
-        # ✅ Use CUDA-accelerated face detection
-        detections = face_detector(dlib_image)
-
-        if not detections:
+        if not face_locations:
             continue
 
-        # Convert dlib detections to (top, right, bottom, left)
-        face_locations = [(d.top(), d.right(), d.bottom(), d.left()) for d in detections]
-
-        # Batch process face encodings
+        # ✅ Face Recognition using CUDA if available
         face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations, num_jitters=1, model="cnn" if USE_CUDA else "hog")
 
         tolerance = 0.5
